@@ -6,7 +6,7 @@
     <title>野生 AR 小食獵人 - 數碼捕捉器升級版</title>
     
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; font-family: -apple-system, sans-serif; -webkit-user-select: none; }
@@ -22,7 +22,8 @@
             background: linear-gradient(to bottom, rgba(15, 32, 67, 0.9), rgba(0,0,0,0)); 
             color: #00FFFF; padding: 20px 15px; text-align: center;
         }
-        .header h1 { margin: 0; font-size: 22px; tracking: 2px; text-shadow: 0 0 10px #00FFFF; }
+        /* 修正 2：將 tracking 改為標準的 letter-spacing */
+        .header h1 { margin: 0; font-size: 22px; letter-spacing: 2px; text-shadow: 0 0 10px #00FFFF; }
         .header p { margin: 6px 0 0 0; color: #FFF; font-size: 13px; }
         
         .footer {
@@ -31,7 +32,7 @@
         }
         #score { font-size: 16px; font-weight: bold; color: #00FF66; text-shadow: 0 0 5px #00FF66; }
         
-        /* 🔥 型格科幻 3D 風格捕捉按鈕 */
+        /* 型格科幻 3D 風格捕捉按鈕 */
         #catch-btn {
             background: linear-gradient(135deg, #FF0055 0%, #9900AA 100%);
             color: white; border: 2px solid #00FFFF; padding: 15px 40px;
@@ -64,7 +65,7 @@
                 
                 <a-entity id="cyber-catcher" position="0 0 -1" raycaster="objects: .wild-snack">
                     
-                    <a-ring id="ring-outer" radius-inner="0.04" radius-outer="0.05" color="#00FFFF" segments-txt="32"
+                    <a-ring id="ring-outer" radius-inner="0.04" radius-outer="0.05" color="#00FFFF" segments-theta="32"
                             animation="property: rotation; to: 0 0 360; dur: 3000; loop: true; easing: linear">
                     </a-ring>
                     
@@ -83,18 +84,19 @@
 
         <a-entity id="snack-container"></a-entity>
 
-    </scene>
+    </a-scene>
 
     <script>
         let siumaiCount = 0;
         let eggCount = 0;
         let currentTarget = null;
+        // 修正：全域加入防止重複捕捉鎖
+        let isCapturing = false;
 
         const container = document.getElementById('snack-container');
         const radarText = document.getElementById('radar-text');
         const catchBtn = document.getElementById('catch-btn');
         
-        // 獲取捕捉器 3D 組件用於更換外觀
         const ringOuter = document.getElementById('ring-outer');
         const ringInner = document.getElementById('ring-inner');
 
@@ -103,12 +105,12 @@
             const type = Math.random() > 0.5 ? 'siumai' : 'egg';
             const id = 'snack-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
             
-            // 360度隨機方位
+            // 360 度環繞隨機方位
             const angle = Math.random() * Math.PI * 2;
-            const radius = 2.2 + Math.random() * 2; // 距離 2.2 - 4.2 米
+            const radius = 2.2 + Math.random() * 2; // 隨機生成在 2.2 至 4.2 米遠處
             const x = Math.sin(angle) * radius;
             const z = Math.cos(angle) * radius;
-            const y = 0.3 + Math.random() * 1.3;     // 高低落差
+            const y = 0.3 + Math.random() * 1.3;    // 高低落差彈性
 
             let snackEntity = document.createElement('a-entity');
             snackEntity.setAttribute('id', id);
@@ -116,11 +118,16 @@
             snackEntity.setAttribute('position', `${x} ${y} ${z}`);
             snackEntity.setAttribute('data-type', type);
             
-            // 特效：等小食自帶微弱自轉旋轉，增加浮空「野生精靈感」
+            // 特效：讓小食自帶微弱自轉
             snackEntity.setAttribute('animation', 'property: rotation; to: 0 360 0; dur: 5000; loop: true; easing: linear');
+            
+            // 修正：加入上下浮動效果，加強漂浮感
+            snackEntity.setAttribute('animation__float', `property: position; from: ${x} ${y} ${z}; to: ${x} ${y + 0.15} ${z}; dir: alternate; loop: true; dur: 1500; easing: easeInOutQuad`);
 
+            // 修正：構建小食外觀，並加入透明的隱形「碰撞球」擴大判定範圍
             if (type === 'siumai') {
                 snackEntity.innerHTML = `
+                    <a-sphere radius="0.25" opacity="0" transparent="true"></a-sphere>
                     <a-cylinder radius="0.006" height="0.4" color="#DEB887" rotation="10 0 15"></a-cylinder>
                     <a-cylinder radius="0.05" height="0.07" position="-0.02 0.1 0" color="#FFD700"></a-cylinder>
                     <a-cylinder radius="0.05" height="0.07" position="0 0 0" color="#FFD700"></a-cylinder>
@@ -128,6 +135,7 @@
                 `;
             } else {
                 snackEntity.innerHTML = `
+                    <a-sphere radius="0.30" opacity="0" transparent="true"></a-sphere>
                     <a-box width="0.35" height="0.42" depth="0.06" color="#E59866"></a-box>
                     <a-sphere radius="0.035" position="-0.06 0.16 0.04" color="#F39C12"></a-sphere>
                     <a-sphere radius="0.035" position="0.06 0.16 0.04" color="#F39C12"></a-sphere>
@@ -135,13 +143,16 @@
                 `;
             }
 
-            // 🔥 【動態反饋】：當高科技捕捉器對準呢個小食
+            // 🔥 【動態反饋】：當科技捕捉器對準該小食時觸發鎖定
             snackEntity.addEventListener('mouseenter', function () {
+                // 如果正在捕捉過程中，則不再鎖定新目標
+                if (isCapturing) return;
+                
                 currentTarget = this;
                 radarText.innerText = `⚠️ TARGET LOCKED: 野生【${type === 'siumai' ? '魚肉燒賣' : '炭燒雞蛋仔'}】!!`;
                 radarText.style.color = "#FF0055";
                 
-                // 變色：捕捉器變成危險警告紅色，並急速收縮
+                // 變色反饋：捕捉器轉為危險警示紅，並急速收縮聚焦
                 ringOuter.setAttribute('color', '#FF0055');
                 ringInner.setAttribute('color', '#FF0055');
                 ringInner.setAttribute('scale', '0.6 0.6 0.6');
@@ -149,17 +160,19 @@
             
             // 當捕捉器移開
             snackEntity.addEventListener('mouseleave', function () {
+                if (isCapturing) return;
+                
                 if (currentTarget === this) currentTarget = null;
                 radarText.innerText = "📡 雷達：四圍旋轉搜尋，小食正隱藏於虛擬經緯度中...";
                 radarText.style.color = "#FFF";
                 
-                // 恢復：變回溫和的科幻螢光藍，恢復呼吸放大狀態
+                // 恢復原狀：變回溫和的科幻螢光藍
                 ringOuter.setAttribute('color', '#00FFFF');
                 ringInner.setAttribute('color', '#00FFFF');
                 ringInner.setAttribute('scale', '1 1 1');
             });
 
-            // 觸控點擊同樣可捕捉
+            // 行動裝置點擊同樣支援直接捕捉
             snackEntity.addEventListener('click', function() {
                 doCapture(this);
             });
@@ -167,12 +180,18 @@
             container.appendChild(snackEntity);
         }
 
-        // 【執行數碼捕捉】
+        // 【執行數碼捕捉與量子縮小動畫】
         function doCapture(el) {
-            if (!el) return;
+            // 修正：狀態防呆，若正在捕捉或節點不存在則直接返回
+            if (!el || isCapturing) return;
+            isCapturing = true;
+            
             const type = el.getAttribute('data-type');
             
-            // 炫酷捕捉動畫：先旋轉再瞬間縮小吸走
+            // 移除浮動動畫，避免與縮小動畫衝突
+            el.removeAttribute('animation__float');
+            
+            // 炫酷捕捉動畫：高速旋轉 + 瞬間縮小至消失點吸走
             el.setAttribute('animation', 'property: rotation; to: 0 1080 0; dur: 300; easing: easeOutQuad');
             el.setAttribute('animation__scale', 'property: scale; to: 0 0 0; dur: 300; easing: easeInBack');
             
@@ -185,32 +204,38 @@
                     document.getElementById('num-egg').innerText = eggCount;
                 }
                 
+                // 移除節點並清空當前鎖定
                 if(el.parentNode) el.parentNode.removeChild(el);
                 currentTarget = null;
                 
-                // 重置捕捉器外觀
+                // 重置捕捉器外觀與雷達文字
                 ringOuter.setAttribute('color', '#00FFFF');
                 ringInner.setAttribute('color', '#00FFFF');
                 ringInner.setAttribute('scale', '1 1 1');
                 radarText.innerText = "⚡ SYSTEM: 成功將分子解構並收入背包！補貨中...";
                 radarText.style.color = "#00FF66";
 
-                // 在其他隨機未知方位重新修補生成新小食
-                setTimeout(spawnRandomSnack, 800);
+                // 在其他隨機未知方位自動重新修補生成新小食
+                setTimeout(() => {
+                    spawnRandomSnack();
+                    // 修正：生成完畢後解開捕捉鎖
+                    isCapturing = false;
+                }, 800);
 
             }, 300);
         }
 
-        // 點擊大按鈕
+        // 點擊主 HUD 捕捉按鈕邏輯
         catchBtn.addEventListener('click', () => {
-            if (currentTarget) {
+            // 修正：加入目標存在檢查 document.body.contains(currentTarget)
+            if (currentTarget && document.body.contains(currentTarget)) {
                 doCapture(currentTarget);
             } else {
                 alert("未鎖定目標！請揸緊手機轉身，用畫面中間嘅【旋轉科技鎖定儀】對準小食！");
             }
         });
 
-        // 開局自動修補生成 5 個隨機方位小食
+        // 頁面載入完成後開局自動修補生成 5 個隨機方位小食
         window.addEventListener('load', () => {
             for(let i = 0; i < 5; i++) {
                 spawnRandomSnack();
