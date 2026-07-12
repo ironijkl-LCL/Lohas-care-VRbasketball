@@ -1,159 +1,452 @@
-⚠️ 問題 1：a-ellipse 並不存在
-你喺 beefball 內：
-<a-ellipse
-    width="0.18"
-    height="0.01"
-    depth="0.18"
-    color="#228B22">
-</a-ellipse>
-A-Frame 1.3 並無：
-<a-ellipse>
-會報錯。
-建議改：
-<a-cylinder
-    radius="0.09"
-    height="0.01"
-    color="#228B22"
-    position="0 -0.08 0">
-</a-cylinder>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>野生 AR 小食獵人 - 終極進化版</title>
+    
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 
----
+    <style>
+        body { margin: 0; overflow: hidden; font-family: -apple-system, sans-serif; -webkit-user-select: none; }
+        .a-enter-vr, .a-enter-ar { display: none !important; }
 
-⚠️ 問題 2：重開遊戲可能殘留怪物
-目前：
-function resetCounters() {
-    ...
-    for(let i = 0; i < 5; i++) {
-        spawnRandomSnack();
-    }
-}
-但沒有：
-container.innerHTML = "";
-如果玩家：
-Stage 1
-↓
-Clear
-↓
-Next Level
-可能出現：
-原本怪物 + 新怪物
-建議：
-function resetCounters() {
+        /* 頂層遊戲 HUD */
+        #game-hud {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 999;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .header {
+            background: linear-gradient(to bottom, rgba(15, 32, 67, 0.95), rgba(0,0,0,0)); 
+            color: #00FFFF; padding: 20px 15px; text-align: center;
+        }
+        .header h1 { margin: 0; font-size: 22px; letter-spacing: 2px; text-shadow: 0 0 10px #00FFFF; }
+        .header p { margin: 6px 0 0 0; color: #FFF; font-size: 13px; }
+        
+        /* 關卡與計時器樣式 */
+        #level-status { display: flex; justify-content: space-around; margin-top: 10px; font-weight: bold; }
+        .status-box { background: rgba(0,0,0,0.6); padding: 5px 12px; border-radius: 15px; border: 1px solid #00FFFF; }
+        #timer { color: #FF3333; text-shadow: 0 0 5px #FF3333; }
+        #target-progress { color: #FFFF00; text-shadow: 0 0 5px #FFFF00; }
 
-    container.innerHTML = "";
+        /* 🚀 推薦加入 COMBO 浮動特效 */
+        #combo-display {
+            font-size: 26px; font-weight: 900; color: #FFD700;
+            text-shadow: 0 0 12px #FF8C00, 0 0 5px #FFF;
+            margin-top: 8px; display: none;
+            animation: pulse 0.3s infinite alternate;
+        }
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
 
-    dimsumCount = 0;
-    bakeryCount = 0;
-    friedCount = 0;
+        .footer {
+            background: linear-gradient(to top, rgba(15, 32, 67, 0.95), rgba(0,0,0,0)); 
+            padding: 30px 25px; text-align: center; color: white;
+        }
+        #score { font-size: 14px; font-weight: bold; color: #00FF66; text-shadow: 0 0 5px #00FF66; line-height: 1.6; }
+        
+        /* 捕捉按鈕 */
+        #catch-btn {
+            background: linear-gradient(135deg, #FF0055 0%, #9900AA 100%);
+            color: white; border: 2px solid #00FFFF; padding: 15px 40px;
+            font-size: 18px; font-weight: bold; border-radius: 35px; cursor: pointer;
+            pointer-events: auto; display: inline-block; margin-top: 15px;
+            box-shadow: 0 0 15px #FF0055, inset 0 0 10px rgba(255,255,255,0.5);
+            letter-spacing: 1px; transition: all 0.2s ease;
+        }
+        #catch-btn:active { transform: scale(0.92); box-shadow: 0 0 5px #FF0055; }
 
-    ...
-}
+        /* 全畫面遮罩 */
+        .overlay-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 20, 40, 0.9); z-index: 1000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: white; text-align: center; display: none;
+        }
+        .overlay-screen h2 { font-size: 32px; margin: 0 0 10px 0; }
+        .overlay-screen p { font-size: 18px; margin: 0 0 25px 0; color: #ccc; }
+        .action-btn {
+            background: #00FFFF; color: #0a1428; border: none; padding: 12px 35px;
+            font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer;
+            box-shadow: 0 0 15px #00FFFF;
+        }
+    </style>
+</head>
+<body>
 
----
+    <div id="game-hud">
+        <div class="header">
+            <h1>🛸 SNACK HUNTER: EVOLUTION</h1>
+            <div id="level-status">
+                <span class="status-box" id="level-title">STAGE 1</span>
+                <span class="status-box">⏳ 剩餘時間: <span id="timer">60</span>s</span>
+                <span class="status-box">🎯 目標進度: <span id="target-progress">0/6</span></span>
+            </div>
+            <div id="combo-display">⚡ COMBO x<span id="combo-count">0</span></div>
+            <p id="radar-text" style="margin-top:12px;">📡 雷達運作中... 轉動手機鎖定野生精靈！</p>
+        </div>
+        
+        <div class="footer">
+            <div id="score">
+                🎒 當前背包：<br>
+                🍡 點心 [<span id="num-dimsum">0</span>] | 🍞 糕餅 [<span id="num-bakery">0</span>] | 🍢 煎炸 [<span id="num-fried">0</span>]
+            </div>
+            <button id="catch-btn">⚡ 啟動數碼捕捉 ⚡</button>
+        </div>
+    </div>
 
-⚠️ 問題 3：HUD 捕捉按鈕沒有存在檢查
-目前：
-if (currentTarget)
-建議：
-if (
-    currentTarget &&
-    document.body.contains(currentTarget)
-)
-改：
-catchBtn.addEventListener('click', () => {
+    <div id="win-screen" class="overlay-screen">
+        <h2 style="color: #00FF66; text-shadow: 0 0 15px #00FF66;">🎉 STAGE CLEAR!</h2>
+        <p id="win-msg">你成功收集了足夠的港式數碼分子！</p>
+        <button class="action-btn" onclick="nextLevel()">進入下一關 ➔</button>
+    </div>
 
-    if (
-        currentTarget &&
-        document.body.contains(currentTarget)
-    ) {
+    <div id="lose-screen" class="overlay-screen">
+        <h2 style="color: #FF3333; text-shadow: 0 0 15px #FF3333;">💥 TIME OVER</h2>
+        <p>數碼磁場已崩潰，精靈全部逃逸了...</p>
+        <button class="action-btn" style="background:#FF0055; box-shadow:0 0 15px #FF0055; color:white;" onclick="restartGame()">重新挑戰 ↻</button>
+    </div>
 
-        doCapture(currentTarget);
+    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;' cursor="rayOrigin: mouse" raycaster="objects: .wild-snack">
+        <a-entity id="camera-rig">
+            <a-camera id="my-camera" look-controls="pointerLockEnabled: false">
+                <a-entity id="cyber-catcher" position="0 0 -1" raycaster="objects: .wild-snack">
+                    <a-ring id="ring-outer" radius-inner="0.04" radius-outer="0.05" color="#00FFFF" segments-theta="32"
+                            animation="property: rotation; to: 0 0 360; dur: 3000; loop: true; easing: linear">
+                    </a-ring>
+                    <a-ring id="ring-inner" radius-inner="0.002" radius-outer="0.015" color="#00FFFF"
+                            animation="property: scale; to: 1.2 1.2 1.2; dur: 800; dir: alternate; loop: true; easing: easeInOutSine">
+                        <a-box width="0.03" height="0.002" depth="0.001" color="#00FFFF"></a-box>
+                        <a-box width="0.002" height="0.03" depth="0.001" color="#00FFFF"></a-box>
+                    </a-ring>
+                    <a-cursor id="hidden-cursor" visible="false"></a-cursor>
+                </a-entity>
+            </a-camera>
+        </a-entity>
+        <a-entity id="snack-container"></a-entity>
+    </scene>
 
-    } else {
+    <script>
+        // 狀態變數
+        let currentLevel = 1;
+        let timeLeft = 60;
+        let gameActive = true;
+        let timerInterval;
+        let isCapturing = false; 
 
-        alert(
-            "未鎖定目標！請將畫面中心的【科幻鎖定儀】對準浮空小食！"
-        );
-    }
-});
-避免：
-Ghost Target
-已刪除節點
-重複捕捉
-問題。
+        // Combo 機制變數
+        let combo = 0;
+        let comboTimer = null;
 
----
+        let dimsumCount = 0;
+        let bakeryCount = 0;
+        let friedCount = 0;
+        let currentTarget = null;
+        let targetPerGroup = 2; 
 
-⚠️ 問題 4：AR.js CDN
-你現在：
-https://rawcdn.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js
-可以用。
-但更常見：
-https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js
-穩定度通常較好。
+        const container = document.getElementById('snack-container');
+        const radarText = document.getElementById('radar-text');
+        const catchBtn = document.getElementById('catch-btn');
+        const ringOuter = document.getElementById('ring-outer');
+        const ringInner = document.getElementById('ring-inner');
 
----
+        const snackList = [
+            { type: 'siumai', name: '皇牌燒賣皇', group: 'dimsum' },
+            { type: 'egglette', name: '黃金雞蛋仔', group: 'dimsum' },
+            { type: 'milktea', name: '港式絲襪奶茶怪', group: 'dimsum' },
+            { type: 'beefball', name: '爆汁牛肉球', group: 'dimsum' },
+            { type: 'fishball', name: '金黃咖喱魚蛋', group: 'dimsum' },
+            { type: 'hargow', name: '晶瑩蝦餃仔', group: 'dimsum' },
+            { type: 'cheongfun', name: '香滑腸粉獸', group: 'dimsum' },
+            { type: 'eggtart', name: '酥皮蛋撻精', group: 'bakery' },
+            { type: 'pineapplebun', name: '菠蘿油怪', group: 'bakery' },
+            { type: 'whitesugarcake', name: '白糖糕仙子', group: 'bakery' },
+            { type: 'putchaiko', name: '砵仔糕幽靈', group: 'bakery' },
+            { type: 'sugaronion', name: '糖蔥餅飛船', group: 'bakery' },
+            { type: 'frenchtoast', name: '西多士立方', group: 'bakery' },
+            { type: 'redbeanice', name: '紅豆冰機甲', group: 'bakery' },
+            { type: 'stinkytofu', name: '臭豆腐方塊', group: 'fried' },
+            { type: 'eggplant', name: '煎釀三寶-矮瓜盾', group: 'fried' },
+            { type: 'greenpepper', name: '煎釀三寶-青椒刺客', group: 'fried' },
+            { type: 'friedintestine', name: '炸大腸飛輪', group: 'fried' },
+            { type: 'waffle', name: '格仔餅矩陣', group: 'fried' },
+            { type: 'quailegg', name: '鵪鶉蛋串燒', group: 'fried' }
+        ];
 
-🚀 問題 5：動畫覆蓋
-例如：
-componentHTML +=
-`
-<a-entity
-animation="property: rotation; ...">
-`
-捕捉時：
-el.setAttribute(
-    'animation',
-    'property: rotation; to: 0 1080 0; dur: 300'
-);
-會覆蓋原本動畫。
-建議：
-平時：
-animation__idle
-例如：
-<a-entity
-animation__idle="
-property: rotation;
-to: 0 360 0;
-loop: true;
-dur: 5000">
-捕捉：
-el.setAttribute(
-    'animation__capture',
-    'property: rotation; to: 0 1080 0; dur: 300'
-);
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gameActive) return;
+                timeLeft--;
+                document.getElementById('timer').innerText = timeLeft;
+                if (timeLeft <= 0) endGame(false);
+            }, 1000);
+        }
 
----
+        // Combo 觸發與重置邏輯
+        function triggerCombo() {
+            combo++;
+            document.getElementById('combo-count').innerText = combo;
+            document.getElementById('combo-display').style.display = "block";
+            
+            // 5 秒沒有捕捉則中斷 Combo
+            clearTimeout(comboTimer);
+            comboTimer = setTimeout(() => {
+                combo = 0;
+                document.getElementById('combo-display').style.display = "none";
+            }, 5000);
+        }
 
-🚀 問題 6：Stage 越高越難但怪數冇增加
-目前：
-targetPerGroup++;
-即：
-Stage 1
-2 + 2 + 2
-Stage 5
-6 + 6 + 6
-但場上仍然：
-5 隻
-到後期會變得好慢。
-可加入：
-const spawnCount =
-    Math.min(10, 5 + currentLevel);
-然後：
-for(let i=0;i<spawnCount;i++){
-    spawnRandomSnack();
-}
-會有明顯關卡感。
+        function updateProgressHUD() {
+            const validDimsum = Math.min(dimsumCount, targetPerGroup);
+            const validBakery = Math.min(bakeryCount, targetPerGroup);
+            const validFried = Math.min(friedCount, targetPerGroup);
+            
+            const currentProgress = validDimsum + validBakery + validFried;
+            const totalTarget = targetPerGroup * 3;
+            
+            document.getElementById('target-progress').innerText = `${currentProgress}/${totalTarget}`;
 
----
+            if (dimsumCount >= targetPerGroup && bakeryCount >= targetPerGroup && friedCount >= targetPerGroup) {
+                endGame(true);
+            }
+        }
 
-🚀 推薦加入 COMBO
-變成：
-let combo = 0;
-捕捉：
-combo++;
-5秒冇捕捉：
-combo = 0;
-HUD：
-⚡ COMBO x5
-遊戲感直線上升。
+        function spawnRandomSnack() {
+            if (!gameActive) return;
+            const targetSnack = snackList[Math.floor(Math.random() * snackList.length)];
+            const type = targetSnack.type;
+            const name = targetSnack.name;
+            const group = targetSnack.group;
+            
+            const id = 'snack-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+            
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 2.0 + Math.random() * 1.5; 
+            const x = Math.sin(angle) * radius;
+            const z = Math.cos(angle) * radius;
+            const y = 0.1 + Math.random() * 1.0;
+
+            let snackEntity = document.createElement('a-entity');
+            snackEntity.setAttribute('id', id);
+            snackEntity.setAttribute('class', 'wild-snack');
+            snackEntity.setAttribute('position', `${x} ${y} ${z}`);
+            snackEntity.setAttribute('data-type', type);
+            snackEntity.setAttribute('data-name', name);
+            snackEntity.setAttribute('data-group', group);
+
+            // 修正 6：外層大範圍隱形碰撞球
+            let componentHTML = `<a-sphere radius="0.25" opacity="0.01" transparent="true" visible="true"></a-sphere>`;
+
+            // 問題 5 修正：將平時動態全部更名為 animation__idle，不干涉捕捉動畫
+            switch (type) {
+                case 'siumai':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"><a-cylinder radius="0.08" height="0.14" color="#FFD700" material="roughness: 0.3;"></a-cylinder><a-cylinder radius="0.085" height="0.15" color="#FFF8DC" material="opacity: 0.4; transparent: true; side: double;" rotation="0 15 5"></a-cylinder><a-sphere radius="0.015" position="0.02 0.075 0.02" color="#FF4500" material="emissive: #FF4500; emissiveIntensity: 2;"></a-sphere><a-sphere radius="0.015" position="-0.02 0.075 0.02" color="#FF4500" material="emissive: #FF4500; emissiveIntensity: 2;"></a-sphere></a-entity>`;
+                    break;
+                case 'egglette':
+                    componentHTML += `<a-entity animation__idle="property: position; to: 0 0.05 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutQuad"><a-box width="0.2" height="0.02" depth="0.2" color="#333" rotation="15 30 0" material="opacity: 0.5; transparent: true;"></a-box><a-entity rotation="15 30 0"><a-sphere radius="0.02" position="-0.04 0.01 -0.04" color="#FFCC00"></a-sphere><a-sphere radius="0.02" position="0 0.01 0" color="#FFCC00" material="emissive: #FFCC00; emissiveIntensity: 0.6;"></a-sphere><a-sphere radius="0.02" position="0.04 0.01 0.04" color="#FFCC00"></a-sphere></a-entity></a-entity>`;
+                    break;
+                case 'milktea':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 0 0 8; dir: alternate; loop: true; dur: 1800; easing: easeInOutSine"><a-cylinder radius-bottom="0.06" radius-top="0.08" height="0.2" color="#FFFFFF" material="opacity: 0.4; transparent: true;"></a-cylinder><a-cylinder radius-bottom="0.055" radius-top="0.075" height="0.18" position="0 -0.01 0" color="#B68A5E"></a-cylinder><a-cylinder radius="0.006" height="0.23" position="0.03 0.08 0" rotation="0 0 -20" color="#00AA55"></a-cylinder></a-entity>`;
+                    break;
+                case 'beefball':
+                    // 問題 1 修正：將不存在的 a-ellipse 替換為標準的 a-cylinder
+                    componentHTML += `<a-entity animation__idle="property: scale; to: 1.08 1.08 1.08; dir: alternate; loop: true; dur: 900; easing: easeInOutQuad"><a-cylinder radius="0.09" height="0.01" color="#228B22" position="0 -0.08 0"></a-cylinder><a-sphere radius="0.08" color="#4A2E2B"></a-sphere></a-entity>`;
+                    break;
+                case 'fishball':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"><a-cylinder radius="0.005" height="0.5" color="#DEB887"></a-cylinder><a-sphere radius="0.055" position="0 0.15 0" color="#FFCC00"></a-sphere><a-sphere radius="0.055" position="0 0.03 0" color="#FFD700"></a-sphere><a-sphere radius="0.055" position="0 -0.09 0" color="#FFAA00"></a-sphere></a-entity>`;
+                    break;
+                case 'hargow':
+                    componentHTML += `<a-entity animation__idle="property: position; to: 0 0.04 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine"><a-sphere radius="0.065" color="#FFB6C1" material="emissive: #FFC0CB; emissiveIntensity: 0.3;"></a-sphere><a-sphere radius="0.075" color="#FFFFFF" material="opacity: 0.5; transparent: true; scale: 1 0.7 1.3;"></a-sphere></a-entity>`;
+                    break;
+                case 'cheongfun':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 5 360 0; loop: true; dur: 7000; easing: linear"><a-cylinder radius="0.025" height="0.18" color="#FFFFFF" rotation="90 0 30"></a-cylinder></a-entity>`;
+                    break;
+                case 'eggtart':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 0 360 0; loop: true; dur: 6000; easing: linear"><a-cylinder radius="0.08" height="0.03" color="#D2691E"></a-cylinder><a-cylinder radius="0.06" height="0.035" position="0 0.005 0" color="#FFD700" material="emissive: #FFD700; emissiveIntensity: 0.2;"></a-cylinder></a-entity>`;
+                    break;
+                case 'pineapplebun':
+                    componentHTML += `<a-entity animation__idle="property: scale; to: 1.05 0.95 1.05; dir: alternate; loop: true; dur: 1100;"><a-sphere radius="0.08" color="#CD853F" material="scale: 1 0.7 1"></a-sphere><a-box width="0.08" height="0.02" depth="0.06" position="0 -0.01 0.02" color="#FFF700"></a-box></a-entity>`;
+                    break;
+                case 'whitesugarcake':
+                    componentHTML += `<a-entity animation__idle="property: position; to: 0 0.05 0; dir: alternate; loop: true; dur: 1600; easing: easeInOutCubic"><a-cone radius-bottom="0.09" height="0.05" segments-radial="3" color="#E0F7FA" material="opacity: 0.6; transparent: true;"></a-cone></a-entity>`;
+                    break;
+                case 'putchaiko':
+                    componentHTML += `<a-entity animation__idle="property: position; to: 0 0.03 0; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine"><a-cylinder radius="0.08" height="0.025" color="#CD853F"></a-cylinder><a-sphere radius="0.01" position="0.02 0.015 0.02" color="#800000"></a-sphere></a-entity>`;
+                    break;
+                case 'sugaronion':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 0 0 360; loop: true; dur: 4000; easing: linear"><a-cylinder radius="0.035" height="0.16" color="#FFFFFF" rotation="0 0 90"></a-cylinder></a-entity>`;
+                    break;
+                case 'frenchtoast':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 360 180 0; loop: true; dur: 8000; easing: linear"><a-box width="0.1" height="0.1" depth="0.1" color="#DEB887"></a-box></a-entity>`;
+                    break;
+                case 'redbeanice':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"><a-cylinder radius="0.05" height="0.2" color="#FFFFFF" material="opacity: 0.3; transparent: true;"></a-cylinder><a-sphere radius="0.04" position="0 0.08 0" color="#FFFDD0"></a-sphere></a-entity>`;
+                    break;
+                case 'stinkytofu':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 45 405 45; loop: true; dur: 7000; easing: linear"><a-box width="0.1" height="0.1" depth="0.1" color="#2C2C2C"></a-box><a-box width="0.06" height="0.01" depth="0.06" position="0 0.046 0" color="#FF0000" material="emissive: #FF0000;"></a-box></a-entity>`;
+                    break;
+                case 'eggplant':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 0 0 360; loop: true; dur: 3500; easing: linear"><a-cylinder radius="0.09" height="0.03" color="#4B0082" rotation="90 0 0"></a-cylinder></a-entity>`;
+                    break;
+                case 'greenpepper':
+                    componentHTML += `<a-entity animation__idle="property: position; to: 0 0 0.04; dir: alternate; loop: true; dur: 600; easing: easeInOutQuad"><a-cone radius-bottom="0.06" radius-top="0.03" height="0.1" color="#006400" rotation="90 0 0"></a-cone></a-entity>`;
+                    break;
+                case 'friedintestine':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 360 0 360; loop: true; dur: 3000; easing: linear"><a-torus radius="0.07" radius-tubular="0.02" color="#D2691E"></a-torus></a-entity>`;
+                    break;
+                case 'waffle':
+                    componentHTML += `<a-entity animation__idle="property: rotation; to: 20 380 0; loop: true; dur: 9000; easing: linear"><a-box width="0.14" height="0.14" depth="0.02" color="#FFA500" rotation="0 0 45"></a-box></a-entity>`;
+                    break;
+                case 'quailegg':
+                    componentHTML += `<a-entity><a-cylinder radius="0.004" height="0.4" color="#DEB887" rotation="0 0 45"></a-cylinder><a-sphere radius="0.03" position="0 0 0" color="#FFFFFF" animation="property: scale; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 400;"></a-sphere></a-entity>`;
+                    break;
+            }
+
+            snackEntity.innerHTML = componentHTML;
+
+            // 鎖定事件
+            snackEntity.addEventListener('mouseenter', function () {
+                if(!gameActive || isCapturing) return;
+                currentTarget = this;
+                radarText.innerText = `⚠️ TARGET LOCKED: 【${name}】!!`;
+                radarText.style.color = "#FF0055";
+                ringOuter.setAttribute('color', '#FF0055');
+                ringInner.setAttribute('color', '#FF0055');
+                ringInner.setAttribute('scale', '0.6 0.6 0.6');
+            });
+            
+            snackEntity.addEventListener('mouseleave', function () {
+                if (currentTarget === this) currentTarget = null;
+                if(!gameActive || isCapturing) return;
+                radarText.innerText = "📡 雷達：旋轉手機搜尋野生地道精靈...";
+                radarText.style.color = "#FFF";
+                ringOuter.setAttribute('color', '#00FFFF');
+                ringInner.setAttribute('color', '#00FFFF');
+                ringInner.setAttribute('scale', '1 1 1');
+            });
+
+            snackEntity.addEventListener('click', function() { doCapture(this); });
+            container.appendChild(snackEntity);
+        }
+
+        function doCapture(el) {
+            if (!el || !gameActive || isCapturing) return;
+            isCapturing = true; 
+
+            const group = el.getAttribute('data-group');
+            const name = el.getAttribute('data-name');
+            
+            // 問題 5 修正：改用獨立命名空間的捕捉動畫，完美與平時動態分流
+            el.setAttribute('animation__capture', 'property: rotation; to: 0 1080 0; dur: 300; easing: easeOutQuad');
+            el.setAttribute('animation__scale', 'property: scale; to: 0 0 0; dur: 300; easing: easeInBack');
+            
+            setTimeout(() => {
+                if (group === 'dimsum') {
+                    dimsumCount++;
+                    document.getElementById('num-dimsum').innerText = dimsumCount;
+                } else if (group === 'bakery') {
+                    bakeryCount++;
+                    document.getElementById('num-bakery').innerText = bakeryCount;
+                } else {
+                    friedCount++;
+                    document.getElementById('num-fried').innerText = friedCount;
+                }
+                
+                if(el.parentNode) el.parentNode.removeChild(el);
+                currentTarget = null;
+                
+                ringOuter.setAttribute('color', '#00FFFF');
+                ringInner.setAttribute('color', '#00FFFF');
+                ringInner.setAttribute('scale', '1 1 1');
+                radarText.innerText = `🎉 成功收服【${name}】！`;
+                radarText.style.color = "#00FF66";
+
+                // 觸發連擊獎勵
+                triggerCombo();
+
+                isCapturing = false;
+                updateProgressHUD();
+                
+                if(gameActive) setTimeout(spawnRandomSnack, 300);
+
+            }, 300);
+        }
+
+        function endGame(isWin) {
+            gameActive = false;
+            clearInterval(timerInterval);
+            clearTimeout(comboTimer);
+            combo = 0;
+            document.getElementById('combo-display').style.display = "none";
+            container.innerHTML = ""; 
+            
+            if (isWin) {
+                document.getElementById('win-msg').innerText = `你已成功集齊 Stage ${currentLevel} 的數碼小食！磁場正往更深層演進...`;
+                document.getElementById('win-screen').style.display = "flex";
+            } else {
+                document.getElementById('lose-screen').style.display = "flex";
+            }
+        }
+
+        function nextLevel() {
+            currentLevel++;
+            targetPerGroup++; 
+            timeLeft = Math.max(30, 65 - (currentLevel * 5)); 
+            
+            document.getElementById('level-title').innerText = `STAGE ${currentLevel}`;
+            document.getElementById('win-screen').style.display = "none";
+            
+            resetCounters();
+        }
+
+        function restartGame() {
+            currentLevel = 1;
+            targetPerGroup = 2;
+            timeLeft = 60;
+            document.getElementById('level-title').innerText = `STAGE 1`;
+            document.getElementById('lose-screen').style.display = "none";
+            resetCounters();
+        }
+
+        function resetCounters() {
+            // 問題 2 修正：重置時立刻強行清空 container 內的所有怪物殘留
+            container.innerHTML = "";
+
+            dimsumCount = 0;
+            bakeryCount = 0;
+            friedCount = 0;
+            document.getElementById('num-dimsum').innerText = 0;
+            document.getElementById('num-bakery').innerText = 0;
+            document.getElementById('num-fried').innerText = 0;
+            
+            isCapturing = false; 
+            gameActive = true;
+            updateProgressHUD();
+            startTimer();
+            
+            // 問題 6 優化：依據關卡數動態調整初始怪量，增加關卡澎湃感
+            const spawnCount = Math.min(10, 5 + currentLevel);
+            for(let i = 0; i < spawnCount; i++) { 
+                spawnRandomSnack(); 
+            }
+        }
+
+        // 問題 3 修正：為 HUD 按鈕補上節點存在檢查檢查，消除 Ghost Target 重複捕捉問題
+        catchBtn.addEventListener('click', () => {
+            if (currentTarget && document.body.contains(currentTarget)) { 
+                doCapture(currentTarget);
+            } else {
+                alert("未鎖定目標！請將畫面中心的【科幻鎖定儀】對準浮空小食！");
+            }
+        });
+
+        window.addEventListener('load', () => {
+            startTimer();
+            // 初始生成
+            for(let i = 0; i < 5; i++) { spawnRandomSnack(); }
+        });
+    </script>
+</body>
+</html>
