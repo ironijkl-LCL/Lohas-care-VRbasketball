@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebVR 互動射籃模擬（Super-hands 版）</title>
+    
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-super-hands-component@master/dist/aframe-super-hands.min.js"></script>
+    
+    <script>
+        AFRAME.registerComponent('voice-spawner', {
+            init: function () {
+                const sceneEl = this.el;
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                
+                if (!SpeechRecognition) return;
+
+                const recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.lang = 'zh-HK';
+                
+                recognition.onresult = function(event) {
+                    const text = event.results[event.resultIndex][0].transcript.trim().toLowerCase();
+                    if (text.includes('波') || text.includes('ball')) {
+                        let ball = document.createElement('a-sphere');
+                        ball.setAttribute('color', '#FF6600');
+                        ball.setAttribute('radius', '0.24');
+                        ball.setAttribute('position', '0 2.5 -1'); // 生成在玩家前方容易抓取的位置
+                        
+                        // 關鍵調整 1：設定高彈性（restitution: 0.85）與掛載 super-hands 抓取屬性
+                        ball.setAttribute('dynamic-body', 'mass: 1; restitution: 0.85; friction: 0.2');
+                        ball.setAttribute('grabbable', 'physicsBodyActivation: listen'); 
+                        
+                        sceneEl.appendChild(ball);
+                        console.log("語音成功生成高彈性球體！");
+                    }
+                };
+
+                recognition.onend = function() { recognition.start(); };
+                window.addEventListener('click', () => { recognition.start(); }, { once: true });
+            }
+        });
+    </script>
+</head>
+<body>
+
+    <a-scene physics="debug: false; gravity: -9.8" voice-spawner>
+        
+        <a-sky color="#B0E0E6"></a-sky>
+
+        <a-plane position="0 0 0" rotation="-90 0 0" width="30" height="30" color="#D2691E" static-body></a-plane>
+
+        <a-cylinder position="0 2 -4" radius="0.1" height="4" color="#7F8C8D" static-body></a-cylinder>
+        <a-box position="0 4 -3.4" width="2.4" height="1.6" depth="0.08" color="#FFFFFF" static-body></a-box>
+        <a-box position="0 3.75 -3.35" width="0.8" height="0.6" depth="0.02" color="#E74C3C" static-body></a-box>
+        
+        <a-torus position="0 3.25 -2.7" rotation="90 0 0" radius="0.38" tube="0.04" color="#FF4500" static-body></a-torus>
+
+        <a-sphere id="basketball" position="0 1.5 -1" radius="0.24" color="#FF6600"
+                  grabbable="physicsBodyActivation: listen"
+                  dynamic-body="mass: 1; restitution: 0.85; friction: 0.2">
+        </a-sphere>
+
+        <a-entity id="rig" position="0 0 0.5">
+            <a-camera position="0 1.6 0"></a-camera>
+            
+            <a-entity hand-controls="hand: left"
+                      hand-tracking-controls="hand: left"
+                      sphere-collider="objects: [grabbable]"  
+                      super-hands="colliderEvent: hitstart; colliderEventProperty: el;
+                                   colliderEndEvent: hitend; colliderEndEventProperty: el"
+                      static-body="shape: sphere; sphereRadius: 0.05">
+            </a-entity>
+
+            <a-entity hand-controls="hand: right"
+                      hand-tracking-controls="hand: right"
+                      sphere-collider="objects: [grabbable]" 
+                      super-hands="colliderEvent: hitstart; colliderEventProperty: el;
+                                   colliderEndEvent: hitend; colliderEndEventProperty: el"
+                      static-body="shape: sphere; sphereRadius: 0.05">
+            </a-entity>
+        </a-entity>
+
+    </scene>
+
+    <div style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
+                background: rgba(0,0,0,0.85); color: white; padding: 15px 25px; border-radius: 25px; 
+                font-family: sans-serif; text-align: center; font-size: 14px; line-height: 1.5; pointer-events: none;">
+        🏀 <b>互動測試指南：</b><br>
+        1. 點擊畫面啟動語音，嗌 <b>「波」</b> 可以隨時補給球。<br>
+        2. 用 <b>VR 眼鏡（如 Quest）</b>打開網頁並進入 VR 模式：<br>
+        伸出手靠近個波，<b>捏合手指（Pinch）</b>或壓下<b>手把 Grab 鍵</b>即可完成「逗波」；<br>
+        模仿射波動作，喺手揮到最高點時<b>鬆開手指</b>，個波就會帶住慣性衝量（Impulse）劃出拋物線飛向籃框！
+    </div>
+
+</body>
+</html>
