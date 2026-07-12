@@ -1,246 +1,159 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>野生 AR 小食獵人 - 數碼捕捉器升級版</title>
-    
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+⚠️ 問題 1：a-ellipse 並不存在
+你喺 beefball 內：
+<a-ellipse
+    width="0.18"
+    height="0.01"
+    depth="0.18"
+    color="#228B22">
+</a-ellipse>
+A-Frame 1.3 並無：
+<a-ellipse>
+會報錯。
+建議改：
+<a-cylinder
+    radius="0.09"
+    height="0.01"
+    color="#228B22"
+    position="0 -0.08 0">
+</a-cylinder>
 
-    <style>
-        body { margin: 0; overflow: hidden; font-family: -apple-system, sans-serif; -webkit-user-select: none; }
-        .a-enter-vr, .a-enter-ar { display: none !important; }
+---
 
-        /* 頂層遊戲 HUD */
-        #game-hud {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 999;
-            display: flex; flex-direction: column; justify-content: space-between;
-        }
-        .header {
-            background: linear-gradient(to bottom, rgba(15, 32, 67, 0.9), rgba(0,0,0,0)); 
-            color: #00FFFF; padding: 20px 15px; text-align: center;
-        }
-        /* 修正 2：將 tracking 改為標準的 letter-spacing */
-        .header h1 { margin: 0; font-size: 22px; letter-spacing: 2px; text-shadow: 0 0 10px #00FFFF; }
-        .header p { margin: 6px 0 0 0; color: #FFF; font-size: 13px; }
-        
-        .footer {
-            background: linear-gradient(to top, rgba(15, 32, 67, 0.9), rgba(0,0,0,0)); 
-            padding: 30px 25px; text-align: center; color: white;
-        }
-        #score { font-size: 16px; font-weight: bold; color: #00FF66; text-shadow: 0 0 5px #00FF66; }
-        
-        /* 型格科幻 3D 風格捕捉按鈕 */
-        #catch-btn {
-            background: linear-gradient(135deg, #FF0055 0%, #9900AA 100%);
-            color: white; border: 2px solid #00FFFF; padding: 15px 40px;
-            font-size: 18px; font-weight: bold; border-radius: 35px; cursor: pointer;
-            pointer-events: auto; display: inline-block; margin-top: 15px;
-            box-shadow: 0 0 15px #FF0055, inset 0 0 10px rgba(255,255,255,0.5);
-            letter-spacing: 1px; transition: all 0.2s ease;
-        }
-        #catch-btn:active { transform: scale(0.92); box-shadow: 0 0 5px #FF0055; }
-    </style>
-</head>
-<body>
+⚠️ 問題 2：重開遊戲可能殘留怪物
+目前：
+function resetCounters() {
+    ...
+    for(let i = 0; i < 5; i++) {
+        spawnRandomSnack();
+    }
+}
+但沒有：
+container.innerHTML = "";
+如果玩家：
+Stage 1
+↓
+Clear
+↓
+Next Level
+可能出現：
+原本怪物 + 新怪物
+建議：
+function resetCounters() {
 
-    <div id="game-hud">
-        <div class="header">
-            <h1>🛸 SNACK HUNTER: CYBER AR</h1>
-            <p id="radar-text">📡 數碼雷達運作中... 轉動手機鎖定野生小食！</p>
-        </div>
-        
-        <div class="footer">
-            <div id="score">🎒 數碼背包：魚肉燒賣 [ <span id="num-siumai">0</span> ] | 雞蛋仔 [ <span id="num-egg">0</span> ]</div>
-            <button id="catch-btn">⚡ 啟動數碼捕捉 ⚡</button>
-        </div>
-    </div>
+    container.innerHTML = "";
 
-    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;' cursor="rayOrigin: mouse" raycaster="objects: .wild-snack">
-        
-        <a-entity id="camera-rig">
-            <a-camera id="my-camera" look-controls="pointerLockEnabled: false">
-                
-                <a-entity id="cyber-catcher" position="0 0 -1" raycaster="objects: .wild-snack">
-                    
-                    <a-ring id="ring-outer" radius-inner="0.04" radius-outer="0.05" color="#00FFFF" segments-theta="32"
-                            animation="property: rotation; to: 0 0 360; dur: 3000; loop: true; easing: linear">
-                    </a-ring>
-                    
-                    <a-ring id="ring-inner" radius-inner="0.002" radius-outer="0.015" color="#00FFFF"
-                            animation="property: scale; to: 1.2 1.2 1.2; dur: 800; dir: alternate; loop: true; easing: easeInOutSine">
-                        <a-box width="0.03" height="0.002" depth="0.001" color="#00FFFF"></a-box>
-                        <a-box width="0.002" height="0.03" depth="0.001" color="#00FFFF"></a-box>
-                    </a-ring>
-                    
-                    <a-cursor id="hidden-cursor" visible="false"></a-cursor>
+    dimsumCount = 0;
+    bakeryCount = 0;
+    friedCount = 0;
 
-                </a-entity>
-                
-            </a-camera>
-        </a-entity>
+    ...
+}
 
-        <a-entity id="snack-container"></a-entity>
+---
 
-    </a-scene>
+⚠️ 問題 3：HUD 捕捉按鈕沒有存在檢查
+目前：
+if (currentTarget)
+建議：
+if (
+    currentTarget &&
+    document.body.contains(currentTarget)
+)
+改：
+catchBtn.addEventListener('click', () => {
 
-    <script>
-        let siumaiCount = 0;
-        let eggCount = 0;
-        let currentTarget = null;
-        // 修正：全域加入防止重複捕捉鎖
-        let isCapturing = false;
+    if (
+        currentTarget &&
+        document.body.contains(currentTarget)
+    ) {
 
-        const container = document.getElementById('snack-container');
-        const radarText = document.getElementById('radar-text');
-        const catchBtn = document.getElementById('catch-btn');
-        
-        const ringOuter = document.getElementById('ring-outer');
-        const ringInner = document.getElementById('ring-inner');
+        doCapture(currentTarget);
 
-        // 【隨機修補生成野生小食】
-        function spawnRandomSnack() {
-            const type = Math.random() > 0.5 ? 'siumai' : 'egg';
-            const id = 'snack-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-            
-            // 360 度環繞隨機方位
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 2.2 + Math.random() * 2; // 隨機生成在 2.2 至 4.2 米遠處
-            const x = Math.sin(angle) * radius;
-            const z = Math.cos(angle) * radius;
-            const y = 0.3 + Math.random() * 1.3;    // 高低落差彈性
+    } else {
 
-            let snackEntity = document.createElement('a-entity');
-            snackEntity.setAttribute('id', id);
-            snackEntity.setAttribute('class', 'wild-snack');
-            snackEntity.setAttribute('position', `${x} ${y} ${z}`);
-            snackEntity.setAttribute('data-type', type);
-            
-            // 特效：讓小食自帶微弱自轉
-            snackEntity.setAttribute('animation', 'property: rotation; to: 0 360 0; dur: 5000; loop: true; easing: linear');
-            
-            // 修正：加入上下浮動效果，加強漂浮感
-            snackEntity.setAttribute('animation__float', `property: position; from: ${x} ${y} ${z}; to: ${x} ${y + 0.15} ${z}; dir: alternate; loop: true; dur: 1500; easing: easeInOutQuad`);
+        alert(
+            "未鎖定目標！請將畫面中心的【科幻鎖定儀】對準浮空小食！"
+        );
+    }
+});
+避免：
+Ghost Target
+已刪除節點
+重複捕捉
+問題。
 
-            // 修正：構建小食外觀，並加入透明的隱形「碰撞球」擴大判定範圍
-            if (type === 'siumai') {
-                snackEntity.innerHTML = `
-                    <a-sphere radius="0.25" opacity="0" transparent="true"></a-sphere>
-                    <a-cylinder radius="0.006" height="0.4" color="#DEB887" rotation="10 0 15"></a-cylinder>
-                    <a-cylinder radius="0.05" height="0.07" position="-0.02 0.1 0" color="#FFD700"></a-cylinder>
-                    <a-cylinder radius="0.05" height="0.07" position="0 0 0" color="#FFD700"></a-cylinder>
-                    <a-cylinder radius="0.05" height="0.07" position="0.02 -0.1 0" color="#FFD700"></a-cylinder>
-                `;
-            } else {
-                snackEntity.innerHTML = `
-                    <a-sphere radius="0.30" opacity="0" transparent="true"></a-sphere>
-                    <a-box width="0.35" height="0.42" depth="0.06" color="#E59866"></a-box>
-                    <a-sphere radius="0.035" position="-0.06 0.16 0.04" color="#F39C12"></a-sphere>
-                    <a-sphere radius="0.035" position="0.06 0.16 0.04" color="#F39C12"></a-sphere>
-                    <a-sphere radius="0.035" position="0 0.20 0.04" color="#D35400"></a-sphere>
-                `;
-            }
+---
 
-            // 🔥 【動態反饋】：當科技捕捉器對準該小食時觸發鎖定
-            snackEntity.addEventListener('mouseenter', function () {
-                // 如果正在捕捉過程中，則不再鎖定新目標
-                if (isCapturing) return;
-                
-                currentTarget = this;
-                radarText.innerText = `⚠️ TARGET LOCKED: 野生【${type === 'siumai' ? '魚肉燒賣' : '炭燒雞蛋仔'}】!!`;
-                radarText.style.color = "#FF0055";
-                
-                // 變色反饋：捕捉器轉為危險警示紅，並急速收縮聚焦
-                ringOuter.setAttribute('color', '#FF0055');
-                ringInner.setAttribute('color', '#FF0055');
-                ringInner.setAttribute('scale', '0.6 0.6 0.6');
-            });
-            
-            // 當捕捉器移開
-            snackEntity.addEventListener('mouseleave', function () {
-                if (isCapturing) return;
-                
-                if (currentTarget === this) currentTarget = null;
-                radarText.innerText = "📡 雷達：四圍旋轉搜尋，小食正隱藏於虛擬經緯度中...";
-                radarText.style.color = "#FFF";
-                
-                // 恢復原狀：變回溫和的科幻螢光藍
-                ringOuter.setAttribute('color', '#00FFFF');
-                ringInner.setAttribute('color', '#00FFFF');
-                ringInner.setAttribute('scale', '1 1 1');
-            });
+⚠️ 問題 4：AR.js CDN
+你現在：
+https://rawcdn.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js
+可以用。
+但更常見：
+https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js
+穩定度通常較好。
 
-            // 行動裝置點擊同樣支援直接捕捉
-            snackEntity.addEventListener('click', function() {
-                doCapture(this);
-            });
+---
 
-            container.appendChild(snackEntity);
-        }
+🚀 問題 5：動畫覆蓋
+例如：
+componentHTML +=
+`
+<a-entity
+animation="property: rotation; ...">
+`
+捕捉時：
+el.setAttribute(
+    'animation',
+    'property: rotation; to: 0 1080 0; dur: 300'
+);
+會覆蓋原本動畫。
+建議：
+平時：
+animation__idle
+例如：
+<a-entity
+animation__idle="
+property: rotation;
+to: 0 360 0;
+loop: true;
+dur: 5000">
+捕捉：
+el.setAttribute(
+    'animation__capture',
+    'property: rotation; to: 0 1080 0; dur: 300'
+);
 
-        // 【執行數碼捕捉與量子縮小動畫】
-        function doCapture(el) {
-            // 修正：狀態防呆，若正在捕捉或節點不存在則直接返回
-            if (!el || isCapturing) return;
-            isCapturing = true;
-            
-            const type = el.getAttribute('data-type');
-            
-            // 移除浮動動畫，避免與縮小動畫衝突
-            el.removeAttribute('animation__float');
-            
-            // 炫酷捕捉動畫：高速旋轉 + 瞬間縮小至消失點吸走
-            el.setAttribute('animation', 'property: rotation; to: 0 1080 0; dur: 300; easing: easeOutQuad');
-            el.setAttribute('animation__scale', 'property: scale; to: 0 0 0; dur: 300; easing: easeInBack');
-            
-            setTimeout(() => {
-                if (type === 'siumai') {
-                    siumaiCount++;
-                    document.getElementById('num-siumai').innerText = siumaiCount;
-                } else {
-                    eggCount++;
-                    document.getElementById('num-egg').innerText = eggCount;
-                }
-                
-                // 移除節點並清空當前鎖定
-                if(el.parentNode) el.parentNode.removeChild(el);
-                currentTarget = null;
-                
-                // 重置捕捉器外觀與雷達文字
-                ringOuter.setAttribute('color', '#00FFFF');
-                ringInner.setAttribute('color', '#00FFFF');
-                ringInner.setAttribute('scale', '1 1 1');
-                radarText.innerText = "⚡ SYSTEM: 成功將分子解構並收入背包！補貨中...";
-                radarText.style.color = "#00FF66";
+---
 
-                // 在其他隨機未知方位自動重新修補生成新小食
-                setTimeout(() => {
-                    spawnRandomSnack();
-                    // 修正：生成完畢後解開捕捉鎖
-                    isCapturing = false;
-                }, 800);
+🚀 問題 6：Stage 越高越難但怪數冇增加
+目前：
+targetPerGroup++;
+即：
+Stage 1
+2 + 2 + 2
+Stage 5
+6 + 6 + 6
+但場上仍然：
+5 隻
+到後期會變得好慢。
+可加入：
+const spawnCount =
+    Math.min(10, 5 + currentLevel);
+然後：
+for(let i=0;i<spawnCount;i++){
+    spawnRandomSnack();
+}
+會有明顯關卡感。
 
-            }, 300);
-        }
+---
 
-        // 點擊主 HUD 捕捉按鈕邏輯
-        catchBtn.addEventListener('click', () => {
-            // 修正：加入目標存在檢查 document.body.contains(currentTarget)
-            if (currentTarget && document.body.contains(currentTarget)) {
-                doCapture(currentTarget);
-            } else {
-                alert("未鎖定目標！請揸緊手機轉身，用畫面中間嘅【旋轉科技鎖定儀】對準小食！");
-            }
-        });
-
-        // 頁面載入完成後開局自動修補生成 5 個隨機方位小食
-        window.addEventListener('load', () => {
-            for(let i = 0; i < 5; i++) {
-                spawnRandomSnack();
-            }
-        });
-    </script>
-</body>
-</html>
+🚀 推薦加入 COMBO
+變成：
+let combo = 0;
+捕捉：
+combo++;
+5秒冇捕捉：
+combo = 0;
+HUD：
+⚡ COMBO x5
+遊戲感直線上升。
