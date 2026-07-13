@@ -31,7 +31,7 @@
         #timer { color: #FF3333; text-shadow: 0 0 5px #FF3333; }
         #target-progress { color: #FFFF00; text-shadow: 0 0 5px #FFFF00; }
 
-        /* 🚀 推薦加入 COMBO 浮動特效 */
+        /* COMBO 浮動特效 */
         #combo-display {
             font-size: 26px; font-weight: 900; color: #FFD700;
             text-shadow: 0 0 12px #FF8C00, 0 0 5px #FFF;
@@ -152,7 +152,7 @@
         const ringInner = document.getElementById('ring-inner');
 
         const snackList = [
-            { type: 'siumai', name: '皇牌燒賣皇', group: 'dimsum' },
+            { type: 'siumai', name: '燒賣機器人', group: 'dimsum' },
             { type: 'egglette', name: '黃金雞蛋仔', group: 'dimsum' },
             { type: 'milktea', name: '港式絲襪奶茶怪', group: 'dimsum' },
             { type: 'beefball', name: '爆汁牛肉球', group: 'dimsum' },
@@ -164,7 +164,7 @@
             { type: 'whitesugarcake', name: '白糖糕仙子', group: 'bakery' },
             { type: 'putchaiko', name: '砵仔糕幽靈', group: 'bakery' },
             { type: 'sugaronion', name: '糖蔥餅飛船', group: 'bakery' },
-            { type: 'frenchtoast', name: '西多士立方', group: 'bakery' },
+            { type: 'frenchtoast', name: '西多士超人', group: 'bakery' },
             { type: 'redbeanice', name: '紅豆冰機甲', group: 'bakery' },
             { type: 'stinkytofu', name: '臭豆腐方塊', group: 'fried' },
             { type: 'eggplant', name: '煎釀三寶-矮瓜盾', group: 'fried' },
@@ -184,13 +184,11 @@
             }, 1000);
         }
 
-        // Combo 觸發與重置邏輯
         function triggerCombo() {
             combo++;
             document.getElementById('combo-count').innerText = combo;
             document.getElementById('combo-display').style.display = "block";
             
-            // 5 秒沒有捕捉則中斷 Combo
             clearTimeout(comboTimer);
             comboTimer = setTimeout(() => {
                 combo = 0;
@@ -236,13 +234,28 @@
             snackEntity.setAttribute('data-name', name);
             snackEntity.setAttribute('data-group', group);
 
-            // 修正 6：外層大範圍隱形碰撞球
+            // 外層大範圍隱形碰撞球，確保射線極易感應
             let componentHTML = `<a-sphere radius="0.25" opacity="0.01" transparent="true" visible="true"></a-sphere>`;
 
-            // 問題 5 修正：將平時動態全部更名為 animation__idle，不干涉捕捉動畫
             switch (type) {
                 case 'siumai':
-                    componentHTML += `<a-entity animation__idle="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"><a-cylinder radius="0.08" height="0.14" color="#FFD700" material="roughness: 0.3;"></a-cylinder><a-cylinder radius="0.085" height="0.15" color="#FFF8DC" material="opacity: 0.4; transparent: true; side: double;" rotation="0 15 5"></a-cylinder><a-sphere radius="0.015" position="0.02 0.075 0.02" color="#FF4500" material="emissive: #FF4500; emissiveIntensity: 2;"></a-sphere><a-sphere radius="0.015" position="-0.02 0.075 0.02" color="#FF4500" material="emissive: #FF4500; emissiveIntensity: 2;"></a-sphere></a-entity>`;
+                    // 🚀 融合：Sumai Robot 圖片精靈 + 雙軌旋轉電磁環
+                    componentHTML += `
+                    <a-entity animation__idle="property: position; to: 0 0.05 0; dir: alternate; loop: true; dur: 1800; easing: easeInOutQuad">
+                        <a-image src="https://qeimdcyaxawuujdmzkxh.supabase.co/storage/v1/object/public/food-images/Sumai%20Robot.jpeg" 
+                                 width="0.32" height="0.32" 
+                                 material="shader: flat; transparent: true; side: double;">
+                        </a-image>
+                        <a-ring radius-inner="0.18" radius-outer="0.20" color="#00FFFF" rotation="90 0 0"
+                                animation__ring1="property: rotation; to: 90 360 0; dur: 5000; loop: true; easing: linear">
+                        </a-ring>
+                        <a-ring radius-inner="0.16" radius-outer="0.17" color="#FF0055" rotation="0 45 0"
+                                animation__ring2="property: rotation; to: 0 45 360; dur: 4000; loop: true; easing: linear">
+                        </a-ring>
+                        <a-sphere radius="0.01" position="0 -0.18 0" color="#00FFFF" material="emissive: #00FFFF; emissiveIntensity: 3;"
+                                  animation__glow="property: scale; to: 1.5 1.5 1.5; dir: alternate; loop: true; dur: 500;">
+                        </a-sphere>
+                    </a-entity>`;
                     break;
                 case 'egglette':
                     componentHTML += `<a-entity animation__idle="property: position; to: 0 0.05 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutQuad"><a-box width="0.2" height="0.02" depth="0.2" color="#333" rotation="15 30 0" material="opacity: 0.5; transparent: true;"></a-box><a-entity rotation="15 30 0"><a-sphere radius="0.02" position="-0.04 0.01 -0.04" color="#FFCC00"></a-sphere><a-sphere radius="0.02" position="0 0.01 0" color="#FFCC00" material="emissive: #FFCC00; emissiveIntensity: 0.6;"></a-sphere><a-sphere radius="0.02" position="0.04 0.01 0.04" color="#FFCC00"></a-sphere></a-entity></a-entity>`;
@@ -251,7 +264,6 @@
                     componentHTML += `<a-entity animation__idle="property: rotation; to: 0 0 8; dir: alternate; loop: true; dur: 1800; easing: easeInOutSine"><a-cylinder radius-bottom="0.06" radius-top="0.08" height="0.2" color="#FFFFFF" material="opacity: 0.4; transparent: true;"></a-cylinder><a-cylinder radius-bottom="0.055" radius-top="0.075" height="0.18" position="0 -0.01 0" color="#B68A5E"></a-cylinder><a-cylinder radius="0.006" height="0.23" position="0.03 0.08 0" rotation="0 0 -20" color="#00AA55"></a-cylinder></a-entity>`;
                     break;
                 case 'beefball':
-                    // 問題 1 修正：將不存在的 a-ellipse 替換為標準的 a-cylinder
                     componentHTML += `<a-entity animation__idle="property: scale; to: 1.08 1.08 1.08; dir: alternate; loop: true; dur: 900; easing: easeInOutQuad"><a-cylinder radius="0.09" height="0.01" color="#228B22" position="0 -0.08 0"></a-cylinder><a-sphere radius="0.08" color="#4A2E2B"></a-sphere></a-entity>`;
                     break;
                 case 'fishball':
@@ -279,10 +291,32 @@
                     componentHTML += `<a-entity animation__idle="property: rotation; to: 0 0 360; loop: true; dur: 4000; easing: linear"><a-cylinder radius="0.035" height="0.16" color="#FFFFFF" rotation="0 0 90"></a-cylinder></a-entity>`;
                     break;
                 case 'frenchtoast':
-                    componentHTML += `<a-entity animation__idle="property: rotation; to: 360 180 0; loop: true; dur: 8000; easing: linear"><a-box width="0.1" height="0.1" depth="0.1" color="#DEB887"></a-box></a-entity>`;
+                    // 🚀 融合：Buttered Toast Superhero 圖片精靈 + 金色能量環
+                    componentHTML += `
+                    <a-entity animation__idle="property: position; to: 0 0.08 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+                        <a-image src="https://qeimdcyaxawuujdmzkxh.supabase.co/storage/v1/object/public/food-images/Buttered%20Toast%20Superhero.jpeg" 
+                                 width="0.35" height="0.35" 
+                                 material="shader: flat; transparent: true; side: double;">
+                        </a-image>
+                        <a-ring radius-inner="0.12" radius-outer="0.15" color="#FFD700" rotation="90 0 0" position="0 -0.18 0"
+                                animation="property: rotation; to: 90 360 0; dur: 4000; loop: true; easing: linear">
+                        </a-ring>
+                    </a-entity>`;
                     break;
                 case 'redbeanice':
-                    componentHTML += `<a-entity animation__idle="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"><a-cylinder radius="0.05" height="0.2" color="#FFFFFF" material="opacity: 0.3; transparent: true;"></a-cylinder><a-sphere radius="0.04" position="0 0.08 0" color="#FFFDD0"></a-sphere></a-entity>`;
+                    // 🚀 融合：Cute Red Bean 圖片精靈 + 科幻冰晶杯機甲罩
+                    componentHTML += `
+                    <a-entity animation__idle="property: position; to: 0 0.06 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
+                        <a-cylinder radius="0.06" height="0.18" color="#AEEEEE" material="opacity: 0.25; transparent: true; roughness: 0.1; metalness: 0.5;">
+                        </a-cylinder>
+                        <a-cone radius-bottom="0.06" height="0.05" position="0 0.09 0" color="#FFFFFF" material="opacity: 0.6; transparent: true;"></a-cone>
+                        <a-image src="https://qeimdcyaxawuujdmzkxh.supabase.co/storage/v1/object/public/food-images/Cute%20Red%20Bean.jpeg" 
+                                 width="0.25" height="0.25" 
+                                 position="0 0.12 0"
+                                 material="shader: flat; transparent: true; side: double;"
+                                 animation__rotate="property: rotation; to: 0 360 0; dur: 6000; loop: true; easing: linear">
+                        </a-image>
+                    </a-entity>`;
                     break;
                 case 'stinkytofu':
                     componentHTML += `<a-entity animation__idle="property: rotation; to: 45 405 45; loop: true; dur: 7000; easing: linear"><a-box width="0.1" height="0.1" depth="0.1" color="#2C2C2C"></a-box><a-box width="0.06" height="0.01" depth="0.06" position="0 0.046 0" color="#FF0000" material="emissive: #FF0000;"></a-box></a-entity>`;
@@ -338,7 +372,7 @@
             const group = el.getAttribute('data-group');
             const name = el.getAttribute('data-name');
             
-            // 問題 5 修正：改用獨立命名空間的捕捉動畫，完美與平時動態分流
+            // 獨立的捕捉命名空間動畫，完美防止動作衝突
             el.setAttribute('animation__capture', 'property: rotation; to: 0 1080 0; dur: 300; easing: easeOutQuad');
             el.setAttribute('animation__scale', 'property: scale; to: 0 0 0; dur: 300; easing: easeInBack');
             
@@ -363,9 +397,7 @@
                 radarText.innerText = `🎉 成功收服【${name}】！`;
                 radarText.style.color = "#00FF66";
 
-                // 觸發連擊獎勵
                 triggerCombo();
-
                 isCapturing = false;
                 updateProgressHUD();
                 
@@ -411,7 +443,7 @@
         }
 
         function resetCounters() {
-            // 問題 2 修正：重置時立刻強行清空 container 內的所有怪物殘留
+            // 清空場景殘留
             container.innerHTML = "";
 
             dimsumCount = 0;
@@ -426,14 +458,13 @@
             updateProgressHUD();
             startTimer();
             
-            // 問題 6 優化：依據關卡數動態調整初始怪量，增加關卡澎湃感
             const spawnCount = Math.min(10, 5 + currentLevel);
             for(let i = 0; i < spawnCount; i++) { 
                 spawnRandomSnack(); 
             }
         }
 
-        // 問題 3 修正：為 HUD 按鈕補上節點存在檢查檢查，消除 Ghost Target 重複捕捉問題
+        // HUD 捕捉按鈕加上節點安全檢查
         catchBtn.addEventListener('click', () => {
             if (currentTarget && document.body.contains(currentTarget)) { 
                 doCapture(currentTarget);
@@ -444,7 +475,6 @@
 
         window.addEventListener('load', () => {
             startTimer();
-            // 初始生成
             for(let i = 0; i < 5; i++) { spawnRandomSnack(); }
         });
     </script>
